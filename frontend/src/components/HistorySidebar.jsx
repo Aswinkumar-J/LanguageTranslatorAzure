@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getHistory } from '../services/api';
+import { getHistory, deleteHistoryEntry } from '../services/api';
 
 export default function HistorySidebar({ refreshTrigger }) {
     const [history, setHistory] = useState([]);
@@ -12,6 +12,18 @@ export default function HistorySidebar({ refreshTrigger }) {
     const copyToClipboard = (text) => {
         navigator.clipboard.writeText(text);
         alert('Copied to clipboard!');
+    };
+
+    const handleDelete = async (e, id, type) => {
+        e.stopPropagation(); // Prevent opening the modal
+        if (window.confirm("Are you sure you want to delete this translation from your history?")) {
+            try {
+                await deleteHistoryEntry(id, type);
+                fetchHistory(); // Refresh to update list and pagination
+            } catch (err) {
+                alert("Failed to delete entry: " + err.message);
+            }
+        }
     };
 
     const fetchHistory = async () => {
@@ -51,6 +63,13 @@ export default function HistorySidebar({ refreshTrigger }) {
                     <ul className="history-list">
                         {paginatedHistory.map((item) => (
                             <li key={item.id} className="history-item" onClick={() => setSelectedItem(item)}>
+                                <button 
+                                    className="delete-item-btn" 
+                                    onClick={(e) => handleDelete(e, item.id, item.type)}
+                                    title="Delete translation"
+                                >
+                                    &times;
+                                </button>
                                 <div className="history-meta">
                                     <span className="small-badge">{item.type === 'pdf_translation' ? 'PDF' : 'Text'}</span>
                                     <span className="history-lang">{item.sourceLanguage} → {item.targetLanguage}</span>

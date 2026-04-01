@@ -466,12 +466,42 @@ h1, h2, h3, h4 {
 .history-item {
   cursor: pointer;
   transition: transform 0.2s, background 0.2s;
+  position: relative;
 }
 
 .history-item:hover {
   background: rgba(30, 41, 59, 0.6);
   transform: scale(1.02);
 }
+
+.delete-item-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #94a3b8;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 10;
+  padding: 0;
+  line-height: 1;
+}
+
+.delete-item-btn:hover {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+  transform: scale(1.1);
+}
+
 
 @keyframes modalFadeIn {
   from { opacity: 0; }

@@ -9,3 +9,4 @@ require('./functions/TranslateText');
 require('./functions/GetHistory');
 require('./functions/ProcessDocument');
 require('./functions/SynthesizeSpeech');
+require('./functions/DeleteHistoryEntry');

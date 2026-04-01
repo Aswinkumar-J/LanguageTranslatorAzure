@@ -7,7 +7,12 @@ const LANGUAGES = [
     { code: 'fr', name: 'French' },
     { code: 'de', name: 'German' },
     { code: 'zh-Hans', name: 'Chinese Simplified' },
-    { code: 'hi', name: 'Hindi' }
+    { code: 'hi', name: 'Hindi' },
+    { code: 'ar', name: 'Arabic' },
+    { code: 'pt', name: 'Portuguese' },
+    { code: 'it', name: 'Italian' },
+    { code: 'ja', name: 'Japanese' },
+    { code: 'ko', name: 'Korean' }
 ];
 
 export default function FileUploadDropzone({ onTranslationSaved }) {
