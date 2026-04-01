@@ -110,9 +110,24 @@ export default function FileUploadDropzone({ onTranslationSaved }) {
                     </div>
                     <h4>Translated Text Snippet:</h4>
                     <p className="translated-text scrollable-text">{result.translatedText}</p>
-                    <div className="mt-3">
+                    
+                    <div className="mt-3 action-buttons">
                         <AudioPlayer text={result.translatedText.substring(0, 500)} language={result.targetLanguage} />
-                        <span className="text-muted text-small ml-2">(Audio restricted to first 500 chars)</span>
+                        
+                        {result.translatedFileUrl && (
+                            <a 
+                                href={result.translatedFileUrl} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="btn-primary download-btn"
+                                style={{textDecoration: 'none', marginLeft: '10px'}}
+                            >
+                                📥 Download Translated PDF
+                            </a>
+                        )}
+                        <span className="text-muted text-small ml-2" style={{display: 'block', marginTop: '10px'}}>
+                            (Audio restricted to first 500 chars)
+                        </span>
                     </div>
                 </div>
             )}
