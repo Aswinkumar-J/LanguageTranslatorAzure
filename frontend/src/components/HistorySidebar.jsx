@@ -74,7 +74,7 @@ export default function HistorySidebar({ refreshTrigger }) {
                                     <span className="small-badge">{item.type === 'pdf_translation' ? 'PDF' : 'Text'}</span>
                                     <span className="history-lang">{item.sourceLanguage} → {item.targetLanguage}</span>
                                 </div>
-                                <p className="history-original">{item.originalText || item.originalFileName}</p>
+                                <p className="history-original">{item.originalText}</p>
                                 <p className="history-translated">{item.translatedText}</p>
                             </li>
                         ))}
@@ -123,15 +123,20 @@ export default function HistorySidebar({ refreshTrigger }) {
                             <div className="modal-section">
                                 <div className="modal-section-header">
                                     <span className="modal-label">Original ({selectedItem.sourceLanguage})</span>
+                                    {selectedItem.originalFileName && (
+                                        <span className="modal-filename" style={{marginLeft: '10px', fontSize: '0.8em', opacity: 0.8}}>
+                                            File: {selectedItem.originalFileName}
+                                        </span>
+                                    )}
                                     <button 
                                         className="copy-btn" 
-                                        onClick={() => copyToClipboard(selectedItem.originalText || selectedItem.originalFileName)}
+                                        onClick={() => copyToClipboard(selectedItem.originalText)}
                                     >
                                         Copy
                                     </button>
                                 </div>
                                 <div className="modal-text-box">
-                                    {selectedItem.originalText || selectedItem.originalFileName}
+                                    {selectedItem.originalText}
                                 </div>
                             </div>
 

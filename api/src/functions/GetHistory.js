@@ -21,7 +21,8 @@ app.http('GetHistory', {
                 history.push({
                     id: entity.rowKey,
                     type: entity.partitionKey,
-                    originalText: entity.originalText || entity.originalFileName,
+                    originalText: entity.originalText || entity.originalFileName, // Keep fallback for existing entries
+                    originalFileName: entity.originalFileName, // Added this
                     translatedText: entity.translatedText,
                     translatedFileUrl: entity.translatedFileUrl,
                     sourceLanguage: entity.sourceLanguage,

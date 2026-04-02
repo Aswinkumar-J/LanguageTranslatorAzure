@@ -32,6 +32,7 @@ app.http('SynthesizeSpeech', {
                     'fr': 'fr-FR',
                     'de': 'de-DE',
                     'hi': 'hi-IN',
+                    'ta': 'ta-IN',
                     'it': 'it-IT',
                     'ja': 'ja-JP',
                     'ko': 'ko-KR',

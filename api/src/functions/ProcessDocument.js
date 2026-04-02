@@ -75,6 +75,7 @@ app.http('ProcessDocument', {
                         partitionKey: "pdf_translation",
                         rowKey: uuidv4(),
                         originalFileName: file.name,
+                        originalText: extractedText.substring(0, 30000), // Fix: Save extracted text
                         translatedText: translatedText.substring(0, 30000), // Ensure we don't exceed Table Storage 32KB limit
                         sourceLanguage: detectedLanguage,
                         targetLanguage,
