@@ -28,6 +28,7 @@ app.http('SynthesizeSpeech', {
             if (language && language.length === 2) {
                 // Common mappings
                 const langMap = {
+                    'en': 'en-US',
                     'es': 'es-ES',
                     'fr': 'fr-FR',
                     'de': 'de-DE',
