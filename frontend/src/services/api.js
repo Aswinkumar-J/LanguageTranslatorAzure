@@ -42,3 +42,8 @@ export const refineTranslation = async (text, targetLanguage, tone) => {
     const response = await axios.post(`${API_BASE}/RefineTranslation`, { text, targetLanguage, tone });
     return response.data;
 };
+
+export const explainTranslation = async (originalText, translatedText, sourceLanguage, targetLanguage) => {
+    const response = await axios.post(`${API_BASE}/ExplainTranslation`, { originalText, translatedText, sourceLanguage, targetLanguage });
+    return response.data;
+};

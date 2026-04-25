@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { translateText, refineTranslation } from '../services/api';
+import { translateText, refineTranslation, explainTranslation } from '../services/api';
 import AudioPlayer from './AudioPlayer';
 
 const LANGUAGES = [
@@ -28,6 +28,10 @@ export default function TranslatorWidget({ onTranslationSaved }) {
     const [tone, setTone] = useState('Professional');
     const [refinedResult, setRefinedResult] = useState(null);
     const [refining, setRefining] = useState(false);
+    
+    // AI Explanation State
+    const [explanation, setExplanation] = useState(null);
+    const [explaining, setExplaining] = useState(false);
 
     const TONES = ['Professional', 'Casual', 'Poetic', 'Humorous', 'Empathetic'];
 
@@ -57,6 +61,25 @@ export default function TranslatorWidget({ onTranslationSaved }) {
             setError(err.response?.data || err.message);
         } finally {
             setRefining(false);
+        }
+    };
+
+    const handleExplain = async () => {
+        if (!result || !result.translatedText) return;
+        setExplaining(true);
+        setError(null);
+        try {
+            const data = await explainTranslation(
+                result.originalText, 
+                result.translatedText, 
+                result.detectedLanguage, 
+                result.targetLanguage
+            );
+            setExplanation(data.explanation);
+        } catch (err) {
+            setError(err.response?.data || err.message);
+        } finally {
+            setExplaining(false);
         }
     };
 
@@ -117,6 +140,14 @@ export default function TranslatorWidget({ onTranslationSaved }) {
                             >
                                 {refining ? 'Refining...' : 'Refine with AI ✨'}
                             </button>
+                            <button 
+                                onClick={handleExplain} 
+                                disabled={explaining}
+                                className="btn-ai-explain"
+                                title="Explain idioms or cultural nuances"
+                            >
+                                {explaining ? 'Explaining...' : 'Explain Nuance 💡'}
+                            </button>
                         </div>
                         
                         {refinedResult && (
@@ -126,6 +157,15 @@ export default function TranslatorWidget({ onTranslationSaved }) {
                                 </div>
                                 <p className="translated-text ai-text">{refinedResult.refinedText}</p>
                                 <AudioPlayer text={refinedResult.refinedText} language={result.targetLanguage} />
+                            </div>
+                        )}
+
+                        {explanation && (
+                            <div className="explanation-box fade-in mt-3">
+                                <div className="result-header">
+                                    <span className="badge explain-badge">💡 Nuance Explained</span>
+                                </div>
+                                <div className="explanation-text">{explanation}</div>
                             </div>
                         )}
                     </div>
