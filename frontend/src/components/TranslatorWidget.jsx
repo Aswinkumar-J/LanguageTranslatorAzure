@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { translateText } from '../services/api';
+import { translateText, refineTranslation } from '../services/api';
 import AudioPlayer from './AudioPlayer';
 
 const LANGUAGES = [
@@ -23,6 +23,13 @@ export default function TranslatorWidget({ onTranslationSaved }) {
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    
+    // AI Refinement State
+    const [tone, setTone] = useState('Professional');
+    const [refinedResult, setRefinedResult] = useState(null);
+    const [refining, setRefining] = useState(false);
+
+    const TONES = ['Professional', 'Casual', 'Poetic', 'Humorous', 'Empathetic'];
 
     const handleTranslate = async () => {
         if (!text.trim()) return;
@@ -36,6 +43,20 @@ export default function TranslatorWidget({ onTranslationSaved }) {
             setError(err.response?.data || err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleRefine = async () => {
+        if (!result || !result.translatedText) return;
+        setRefining(true);
+        setError(null);
+        try {
+            const data = await refineTranslation(result.translatedText, result.targetLanguage, tone);
+            setRefinedResult(data);
+        } catch (err) {
+            setError(err.response?.data || err.message);
+        } finally {
+            setRefining(false);
         }
     };
 
@@ -76,6 +97,38 @@ export default function TranslatorWidget({ onTranslationSaved }) {
                     </div>
                     <p className="translated-text">{result.translatedText}</p>
                     <AudioPlayer text={result.translatedText} language={result.targetLanguage} />
+                    
+                    {/* AI Refinement Section */}
+                    <div className="ai-refinement-section mt-4">
+                        <div className="controls-group">
+                            <select 
+                                className="modern-select ai-tone-select" 
+                                value={tone} 
+                                onChange={(e) => setTone(e.target.value)}
+                            >
+                                {TONES.map(t => (
+                                    <option key={t} value={t}>{t} Tone</option>
+                                ))}
+                            </select>
+                            <button 
+                                onClick={handleRefine} 
+                                disabled={refining}
+                                className="btn-ai-magic"
+                            >
+                                {refining ? 'Refining...' : 'Refine with AI ✨'}
+                            </button>
+                        </div>
+                        
+                        {refinedResult && (
+                            <div className="refined-box fade-in mt-3">
+                                <div className="result-header">
+                                    <span className="badge ai-badge">✨ AI {refinedResult.tone} Tone</span>
+                                </div>
+                                <p className="translated-text ai-text">{refinedResult.refinedText}</p>
+                                <AudioPlayer text={refinedResult.refinedText} language={result.targetLanguage} />
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

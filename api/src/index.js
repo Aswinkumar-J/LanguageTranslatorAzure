@@ -10,3 +10,4 @@ require('./functions/GetHistory');
 require('./functions/ProcessDocument');
 require('./functions/SynthesizeSpeech');
 require('./functions/DeleteHistoryEntry');
+require('./functions/RefineTranslation');

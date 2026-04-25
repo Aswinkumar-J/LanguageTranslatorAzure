@@ -37,3 +37,8 @@ export const deleteHistoryEntry = async (id, type) => {
     });
     return response.data;
 };
+
+export const refineTranslation = async (text, targetLanguage, tone) => {
+    const response = await axios.post(`${API_BASE}/RefineTranslation`, { text, targetLanguage, tone });
+    return response.data;
+};
