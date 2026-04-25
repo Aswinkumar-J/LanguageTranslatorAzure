@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { translateText, refineTranslation, explainTranslation } from '../services/api';
+import { translateText, refineTranslation, explainTranslation, generateConversationStarters } from '../services/api';
 import AudioPlayer from './AudioPlayer';
 
 const LANGUAGES = [
@@ -32,6 +32,10 @@ export default function TranslatorWidget({ onTranslationSaved }) {
     // AI Explanation State
     const [explanation, setExplanation] = useState(null);
     const [explaining, setExplaining] = useState(false);
+
+    // AI Starters State
+    const [starters, setStarters] = useState([]);
+    const [generatingStarters, setGeneratingStarters] = useState(false);
 
     const TONES = ['Professional', 'Casual', 'Poetic', 'Humorous', 'Empathetic'];
 
@@ -81,6 +85,26 @@ export default function TranslatorWidget({ onTranslationSaved }) {
         } finally {
             setExplaining(false);
         }
+    };
+
+    const handleGenerateStarters = async () => {
+        if (!result || !result.translatedText) return;
+        setGeneratingStarters(true);
+        setError(null);
+        try {
+            const data = await generateConversationStarters(result.translatedText, result.targetLanguage);
+            setStarters(data.starters || []);
+        } catch (err) {
+            setError(err.response?.data || err.message);
+        } finally {
+            setGeneratingStarters(false);
+        }
+    };
+
+    const handleStarterClick = (targetPhrase) => {
+        setText(targetPhrase);
+        // We set the target lang back to English to translate the follow up? 
+        // Actually, let's just populate the input. The user can switch languages if they want.
     };
 
     return (
@@ -148,6 +172,14 @@ export default function TranslatorWidget({ onTranslationSaved }) {
                             >
                                 {explaining ? 'Explaining...' : 'Explain Nuance 💡'}
                             </button>
+                            <button 
+                                onClick={handleGenerateStarters} 
+                                disabled={generatingStarters}
+                                className="btn-ai-starter"
+                                title="Suggest follow-up phrases"
+                            >
+                                {generatingStarters ? 'Thinking...' : 'Suggest Follow-ups 💬'}
+                            </button>
                         </div>
                         
                         {refinedResult && (
@@ -166,6 +198,27 @@ export default function TranslatorWidget({ onTranslationSaved }) {
                                     <span className="badge explain-badge">💡 Nuance Explained</span>
                                 </div>
                                 <div className="explanation-text">{explanation}</div>
+                            </div>
+                        )}
+
+                        {starters && starters.length > 0 && (
+                            <div className="starters-container fade-in mt-3">
+                                <div className="result-header">
+                                    <span className="badge starter-badge">💬 Suggested Follow-ups</span>
+                                </div>
+                                <div className="starters-list">
+                                    {starters.map((starter, idx) => (
+                                        <div 
+                                            key={idx} 
+                                            className="starter-chip"
+                                            onClick={() => handleStarterClick(starter.targetPhrase)}
+                                            title="Click to use this phrase"
+                                        >
+                                            <div className="starter-target">{starter.targetPhrase}</div>
+                                            <div className="starter-source">{starter.sourceTranslation}</div>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
                         )}
                     </div>

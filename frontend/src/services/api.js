@@ -47,3 +47,8 @@ export const explainTranslation = async (originalText, translatedText, sourceLan
     const response = await axios.post(`${API_BASE}/ExplainTranslation`, { originalText, translatedText, sourceLanguage, targetLanguage });
     return response.data;
 };
+
+export const generateConversationStarters = async (translatedText, targetLanguage) => {
+    const response = await axios.post(`${API_BASE}/GenerateConversationStarters`, { translatedText, targetLanguage });
+    return response.data;
+};

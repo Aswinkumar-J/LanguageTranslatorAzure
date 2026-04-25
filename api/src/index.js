@@ -12,3 +12,4 @@ require('./functions/SynthesizeSpeech');
 require('./functions/DeleteHistoryEntry');
 require('./functions/RefineTranslation');
 require('./functions/ExplainTranslation');
+require('./functions/GenerateConversationStarters');
