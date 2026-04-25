@@ -767,3 +767,31 @@ h1, h2, h3, h4 {
   font-style: italic;
 }
 
+/* AI Source Optimizer Styles */
+.btn-ai-optimize {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  background: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #fbbf24;
+  padding: 0.4rem 0.8rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  z-index: 10;
+}
+
+.btn-ai-optimize:hover:not(:disabled) {
+  background: rgba(245, 158, 11, 0.3);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+}
+
+.btn-ai-optimize:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+

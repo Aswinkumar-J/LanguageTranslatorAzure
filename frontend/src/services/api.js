@@ -52,3 +52,8 @@ export const generateConversationStarters = async (translatedText, targetLanguag
     const response = await axios.post(`${API_BASE}/GenerateConversationStarters`, { translatedText, targetLanguage });
     return response.data;
 };
+
+export const optimizeSourceText = async (text) => {
+    const response = await axios.post(`${API_BASE}/OptimizeSourceText`, { text });
+    return response.data;
+};

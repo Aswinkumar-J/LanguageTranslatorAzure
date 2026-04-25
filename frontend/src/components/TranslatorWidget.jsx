@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { translateText, refineTranslation, explainTranslation, generateConversationStarters } from '../services/api';
+import { translateText, refineTranslation, explainTranslation, generateConversationStarters, optimizeSourceText } from '../services/api';
 import AudioPlayer from './AudioPlayer';
 
 const LANGUAGES = [
@@ -23,6 +23,7 @@ export default function TranslatorWidget({ onTranslationSaved }) {
     const [result, setResult] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+    const [optimizing, setOptimizing] = useState(false);
     
     // AI Refinement State
     const [tone, setTone] = useState('Professional');
@@ -51,6 +52,22 @@ export default function TranslatorWidget({ onTranslationSaved }) {
             setError(err.response?.data || err.message);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleOptimize = async () => {
+        if (!text.trim()) return;
+        setOptimizing(true);
+        setError(null);
+        try {
+            const data = await optimizeSourceText(text);
+            if (data.optimizedText) {
+                setText(data.optimizedText);
+            }
+        } catch (err) {
+            setError(err.response?.data || err.message);
+        } finally {
+            setOptimizing(false);
         }
     };
 
@@ -110,7 +127,7 @@ export default function TranslatorWidget({ onTranslationSaved }) {
     return (
         <div className="card widget-container glass-panel">
             <h2>Text Translation</h2>
-            <div className="input-group">
+            <div className="input-group" style={{ position: 'relative' }}>
                 <textarea 
                     placeholder="Enter text to translate..." 
                     value={text}
@@ -118,6 +135,16 @@ export default function TranslatorWidget({ onTranslationSaved }) {
                     rows={4}
                     className="modern-input"
                 />
+                {text.trim() && (
+                    <button 
+                        onClick={handleOptimize} 
+                        disabled={optimizing}
+                        className="btn-ai-optimize"
+                        title="Fix grammar and improve clarity"
+                    >
+                        {optimizing ? '✨' : 'Optimize ✨'}
+                    </button>
+                )}
             </div>
             
             <div className="controls-group">
