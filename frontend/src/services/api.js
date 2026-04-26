@@ -57,3 +57,8 @@ export const optimizeSourceText = async (text) => {
     const response = await axios.post(`${API_BASE}/OptimizeSourceText`, { text });
     return response.data;
 };
+
+export const getTopicLinks = async (text, language) => {
+    const response = await axios.post(`${API_BASE}/GetTopicLinks`, { text, language });
+    return response.data;
+};

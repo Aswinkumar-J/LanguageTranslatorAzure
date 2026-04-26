@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { translateText, refineTranslation, explainTranslation, generateConversationStarters, optimizeSourceText } from '../services/api';
+import { translateText, refineTranslation, explainTranslation, generateConversationStarters, optimizeSourceText, getTopicLinks } from '../services/api';
 import AudioPlayer from './AudioPlayer';
 
 const LANGUAGES = [
@@ -37,6 +37,10 @@ export default function TranslatorWidget({ onTranslationSaved }) {
     // AI Starters State
     const [starters, setStarters] = useState([]);
     const [generatingStarters, setGeneratingStarters] = useState(false);
+
+    // AI Topic Links State
+    const [topicLinks, setTopicLinks] = useState([]);
+    const [loadingLinks, setLoadingLinks] = useState(false);
 
     const TONES = ['Professional', 'Casual', 'Poetic', 'Humorous', 'Empathetic'];
 
@@ -120,8 +124,20 @@ export default function TranslatorWidget({ onTranslationSaved }) {
 
     const handleStarterClick = (targetPhrase) => {
         setText(targetPhrase);
-        // We set the target lang back to English to translate the follow up? 
-        // Actually, let's just populate the input. The user can switch languages if they want.
+    };
+
+    const handleGetTopicLinks = async () => {
+        if (!result || !result.translatedText) return;
+        setLoadingLinks(true);
+        setError(null);
+        try {
+            const data = await getTopicLinks(result.translatedText, result.targetLanguage);
+            setTopicLinks(data.links || []);
+        } catch (err) {
+            setError(err.response?.data || err.message);
+        } finally {
+            setLoadingLinks(false);
+        }
     };
 
     return (
@@ -207,6 +223,14 @@ export default function TranslatorWidget({ onTranslationSaved }) {
                             >
                                 {generatingStarters ? 'Thinking...' : 'Suggest Follow-ups 💬'}
                             </button>
+                            <button 
+                                onClick={handleGetTopicLinks} 
+                                disabled={loadingLinks}
+                                className="btn-ai-links"
+                                title="Get relevant web links for topics in this text"
+                            >
+                                {loadingLinks ? 'Searching...' : 'Explore Topics 🌍'}
+                            </button>
                         </div>
                         
                         {refinedResult && (
@@ -244,6 +268,28 @@ export default function TranslatorWidget({ onTranslationSaved }) {
                                             <div className="starter-target">{starter.targetPhrase}</div>
                                             <div className="starter-source">{starter.sourceTranslation}</div>
                                         </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {topicLinks && topicLinks.length > 0 && (
+                            <div className="links-container fade-in mt-3">
+                                <div className="result-header">
+                                    <span className="badge links-badge">🌍 Explore Topics</span>
+                                </div>
+                                <div className="links-list">
+                                    {topicLinks.map((link, idx) => (
+                                        <a 
+                                            key={idx} 
+                                            href={link.url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="topic-link-card"
+                                        >
+                                            <div className="link-title">{link.title}</div>
+                                            <div className="link-desc">{link.description}</div>
+                                        </a>
                                     ))}
                                 </div>
                             </div>

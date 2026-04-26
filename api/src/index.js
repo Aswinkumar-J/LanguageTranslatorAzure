@@ -14,3 +14,4 @@ require('./functions/RefineTranslation');
 require('./functions/ExplainTranslation');
 require('./functions/GenerateConversationStarters');
 require('./functions/OptimizeSourceText');
+require('./functions/GetTopicLinks');
