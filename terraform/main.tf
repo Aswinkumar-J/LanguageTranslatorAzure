@@ -1,12 +1,12 @@
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
-  location = var.primary_location
+  location = var.rg_location
 }
 
 resource "azurerm_storage_account" "storage" {
   name                          = var.storage_account_name
   resource_group_name           = azurerm_resource_group.rg.name
-  location                      = var.primary_location
+  location                      = var.secondary_location
   account_tier                  = "Standard"
   account_replication_type      = "LRS"
   min_tls_version               = "TLS1_2"
@@ -16,7 +16,7 @@ resource "azurerm_storage_account" "storage" {
 
 resource "azurerm_log_analytics_workspace" "logs" {
   name                = var.log_analytics_workspace_name
-  location            = var.primary_location
+  location            = var.secondary_location
   resource_group_name = azurerm_resource_group.rg.name
   sku                 = "PerGB2018"
   retention_in_days   = 30
@@ -24,7 +24,7 @@ resource "azurerm_log_analytics_workspace" "logs" {
 
 resource "azurerm_container_app_environment" "ace" {
   name                       = var.container_app_environment_name
-  location                   = var.primary_location
+  location                   = var.secondary_location
   resource_group_name        = azurerm_resource_group.rg.name
   log_analytics_workspace_id = azurerm_log_analytics_workspace.logs.id
 
@@ -32,12 +32,19 @@ resource "azurerm_container_app_environment" "ace" {
     name                  = "Consumption"
     workload_profile_type = "Consumption"
   }
+
+  lifecycle {
+    ignore_changes = [
+      log_analytics_workspace_id,
+      workload_profile
+    ]
+  }
 }
 
 resource "azurerm_container_registry" "acr" {
   name                = var.acr_name
   resource_group_name = azurerm_resource_group.rg.name
-  location            = var.primary_location
+  location            = var.secondary_location
   sku                 = "Basic"
   admin_enabled       = true
 }
@@ -47,12 +54,14 @@ resource "azurerm_cognitive_account" "translator" {
   location            = var.translator_location
   resource_group_name = azurerm_resource_group.rg.name
   kind                = "TextTranslation"
-  sku_name            = "S1" # Updated to S1 as per JSON
+  sku_name            = "S1"
+  
+  custom_subdomain_name = var.cognitive_translator_name
 }
 
 resource "azurerm_cognitive_account" "speech" {
   name                = var.cognitive_speech_name
-  location            = var.primary_location
+  location            = var.secondary_location
   resource_group_name = azurerm_resource_group.rg.name
   kind                = "SpeechServices"
   sku_name            = "F0"
@@ -60,7 +69,7 @@ resource "azurerm_cognitive_account" "speech" {
 
 resource "azurerm_key_vault" "vault" {
   name                        = var.key_vault_name
-  location                    = var.primary_location
+  location                    = var.secondary_location
   resource_group_name         = azurerm_resource_group.rg.name
   enabled_for_disk_encryption = false
   tenant_id                   = data.azurerm_client_config.current.tenant_id
@@ -78,6 +87,11 @@ resource "azurerm_container_app" "app" {
   container_app_environment_id = azurerm_container_app_environment.ace.id
   resource_group_name          = azurerm_resource_group.rg.name
   revision_mode                = "Single"
+
+  registry {
+    server   = "${var.acr_name}.azurecr.io"
+    identity = "system-environment"
+  }
 
   template {
     container {
@@ -108,7 +122,7 @@ resource "azurerm_container_app" "app" {
       }
       env {
         name  = "SPEECH_REGION"
-        value = var.primary_location
+        value = var.secondary_location
       }
       env {
         name  = "AZURE_STORAGE_CONNECTION_STRING"
@@ -124,7 +138,7 @@ resource "azurerm_container_app" "app" {
   ingress {
     allow_insecure_connections = false
     external_enabled           = true
-    target_port                = 3000 # Updated to 3000 as per JSON
+    target_port                = 3000
     traffic_weight {
       percentage      = 100
       latest_revision = true

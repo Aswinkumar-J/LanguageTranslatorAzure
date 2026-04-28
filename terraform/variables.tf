@@ -4,8 +4,14 @@ variable "resource_group_name" {
   default     = "cloud-project-rg"
 }
 
-variable "primary_location" {
-  description = "Primary Azure region (Central India)"
+variable "rg_location" {
+  description = "Location of the Resource Group"
+  type        = string
+  default     = "southeastasia"
+}
+
+variable "secondary_location" {
+  description = "Location for other resources (Central India)"
   type        = string
   default     = "centralindia"
 }
@@ -87,4 +93,30 @@ variable "storage_connection_string" {
   description = "Connection string for the Storage Account"
   type        = string
   sensitive   = true
+}
+
+# Authentication Variables (Optional if using Azure CLI)
+variable "subscription_id" {
+  description = "Azure Subscription ID"
+  type        = string
+  default     = "94bf1b45-40a3-491b-a540-93553402617e"
+}
+
+variable "tenant_id" {
+  description = "Azure Tenant ID"
+  type        = string
+  default     = "6070ff68-33e0-4724-a42f-768f0963ae2b"
+}
+
+variable "client_id" {
+  description = "Azure Service Principal Client ID"
+  type        = string
+  default     = ""
+}
+
+variable "client_secret" {
+  description = "Azure Service Principal Client Secret"
+  type        = string
+  sensitive   = true
+  default     = ""
 }
