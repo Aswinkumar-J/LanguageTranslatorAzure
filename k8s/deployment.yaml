@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: translator-deployment
+  labels:
+    app: translator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: translator
+  template:
+    metadata:
+      labels:
+        app: translator
+    spec:
+      containers:
+      - name: translator-app
+        image: <acr-name>.azurecr.io/translator-app:latest
+        ports:
+        - containerPort: 3000
+        env:
+        # Note: You should use Kubernetes Secrets in production
+        - name: PORT
+          value: "3000"
+        - name: TRANSLATOR_KEY
+          value: "<your-translator-key>"
+        - name: TRANSLATOR_ENDPOINT
+          value: "<your-translator-endpoint>"
+        - name: TRANSLATOR_REGION
+          value: "<your-translator-region>"
+        - name: GEMINI_API_KEY
+          value: "<your-gemini-key>"
+        - name: SPEECH_KEY
+          value: "<your-speech-key>"
+        - name: SPEECH_REGION
+          value: "<your-speech-region>"
+        - name: AZURE_STORAGE_CONNECTION_STRING
+          value: "<your-storage-connection-string>"

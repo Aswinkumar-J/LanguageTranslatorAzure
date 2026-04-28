@@ -1,0 +1,358 @@
+const express = require('express');
+const cors = require('cors');
+const multer = require('multer');
+const axios = require('axios');
+const { v4: uuidv4 } = require('uuid');
+const { TableClient } = require('@azure/data-tables');
+const pdf = require('pdf-parse');
+const sdk = require('microsoft-cognitiveservices-speech-sdk');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+const path = require('path');
+
+const app = express();
+const port = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+const upload = multer({ storage: multer.memoryStorage() });
+
+// --- TranslateText ---
+app.post('/api/TranslateText', async (req, res) => {
+    try {
+        const { text, targetLanguage } = req.body;
+        if (!text || !targetLanguage) {
+            return res.status(400).send("Missing 'text' or 'targetLanguage' field.");
+        }
+
+        const translatorKey = process.env.TRANSLATOR_KEY;
+        const endpoint = process.env.TRANSLATOR_ENDPOINT;
+        const region = process.env.TRANSLATOR_REGION;
+
+        if (!translatorKey) return res.status(500).send("Translator configuration is missing.");
+
+        const url = `${endpoint}/translate?api-version=3.0&to=${targetLanguage}`;
+        const response = await axios.post(url, [{ 'text': text }], {
+            headers: {
+                'Ocp-Apim-Subscription-Key': translatorKey,
+                'Ocp-Apim-Subscription-Region': region,
+                'Content-type': 'application/json',
+                'X-ClientTraceId': uuidv4().toString()
+            }
+        });
+
+        const translationResult = response.data[0];
+        const translatedText = translationResult.translations[0].text;
+        const detectedLanguage = translationResult.detectedLanguage?.language || 'unknown';
+
+        try {
+            const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+            if (connectionString) {
+                const tableClient = TableClient.fromConnectionString(connectionString, "TranslationHistory");
+                await tableClient.createTable();
+                await tableClient.createEntity({
+                    partitionKey: "text_translation",
+                    rowKey: uuidv4(),
+                    originalText: text,
+                    translatedText,
+                    sourceLanguage: detectedLanguage,
+                    targetLanguage,
+                    timestamp: new Date()
+                });
+            }
+        } catch (err) {
+            console.warn('Failed to save history to Table Storage', err);
+        }
+
+        res.json({
+            originalText: text,
+            translatedText,
+            detectedLanguage,
+            targetLanguage
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send("An error occurred during translation: " + error.message);
+    }
+});
+
+// --- GetHistory ---
+app.get('/api/GetHistory', async (req, res) => {
+    try {
+        const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+        if (!connectionString) return res.status(500).send("Storage connection string is missing.");
+
+        const tableClient = TableClient.fromConnectionString(connectionString, "TranslationHistory");
+        await tableClient.createTable();
+        
+        const entities = tableClient.listEntities();
+        const history = [];
+        
+        for await (const entity of entities) {
+            history.push({
+                id: entity.rowKey,
+                type: entity.partitionKey,
+                originalText: entity.originalText || entity.originalFileName,
+                originalFileName: entity.originalFileName,
+                translatedText: entity.translatedText,
+                translatedFileUrl: entity.translatedFileUrl,
+                sourceLanguage: entity.sourceLanguage,
+                targetLanguage: entity.targetLanguage,
+                timestamp: entity.timestamp
+            });
+        }
+
+        history.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        res.json(history);
+    } catch (error) {
+        res.status(500).send("An error occurred while retrieving history: " + error.message);
+    }
+});
+
+// --- ProcessDocument ---
+app.post('/api/ProcessDocument', upload.single('file'), async (req, res) => {
+    try {
+        const file = req.file;
+        const targetLanguage = req.body.targetLanguage;
+
+        if (!file || !targetLanguage) {
+            return res.status(400).send("Missing 'file' or 'targetLanguage' field.");
+        }
+
+        const pdfData = await pdf(file.buffer);
+        const extractedText = pdfData.text;
+
+        const translatorKey = process.env.TRANSLATOR_KEY;
+        const endpoint = process.env.TRANSLATOR_ENDPOINT;
+        const region = process.env.TRANSLATOR_REGION;
+
+        if (!translatorKey) return res.status(500).send("Translator configuration is missing.");
+
+        const url = `${endpoint}/translate?api-version=3.0&to=${targetLanguage}`;
+        
+        let translatedText = '';
+        let detectedLanguage = 'unknown';
+        const chunkSize = 5000;
+        const chunks = [];
+        for (let i = 0; i < extractedText.length; i += chunkSize) {
+            chunks.push(extractedText.substring(i, i + chunkSize));
+        }
+
+        for (const chunk of chunks) {
+            const response = await axios.post(url, [{ 'text': chunk }], {
+                headers: {
+                    'Ocp-Apim-Subscription-Key': translatorKey,
+                    'Ocp-Apim-Subscription-Region': region,
+                    'Content-type': 'application/json',
+                    'X-ClientTraceId': uuidv4().toString()
+                }
+            });
+            const result = response.data[0];
+            translatedText += result.translations[0].text + '\n';
+            if (detectedLanguage === 'unknown' && result.detectedLanguage) {
+                detectedLanguage = result.detectedLanguage.language;
+            }
+        }
+
+        try {
+            const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+            if (connectionString) {
+                const tableClient = TableClient.fromConnectionString(connectionString, "TranslationHistory");
+                await tableClient.createTable();
+                await tableClient.createEntity({
+                    partitionKey: "pdf_translation",
+                    rowKey: uuidv4(),
+                    originalFileName: file.originalname,
+                    originalText: extractedText.substring(0, 30000),
+                    translatedText: translatedText.substring(0, 30000),
+                    sourceLanguage: detectedLanguage,
+                    targetLanguage,
+                    timestamp: new Date()
+                });
+            }
+        } catch (err) {
+            console.warn('Failed to save history', err);
+        }
+
+        res.json({
+            originalText: extractedText.substring(0, 1000),
+            translatedText,
+            detectedLanguage,
+            targetLanguage
+        });
+    } catch (error) {
+        res.status(500).send("Error processing document: " + error.message);
+    }
+});
+
+// --- SynthesizeSpeech ---
+app.post('/api/SynthesizeSpeech', async (req, res) => {
+    try {
+        const { text, language } = req.body;
+        if (!text) return res.status(400).send("Missing 'text' field.");
+
+        const speechKey = process.env.SPEECH_KEY;
+        const speechRegion = process.env.SPEECH_REGION;
+
+        if (!speechKey || !speechRegion) return res.status(500).send("Speech Service configuration missing.");
+
+        const speechConfig = sdk.SpeechConfig.fromSubscription(speechKey, speechRegion);
+        
+        if (language && language.length === 2) {
+            const langMap = {
+                'en': 'en-US', 'es': 'es-ES', 'fr': 'fr-FR', 'de': 'de-DE',
+                'hi': 'hi-IN', 'ta': 'ta-IN', 'it': 'it-IT', 'ja': 'ja-JP',
+                'ko': 'ko-KR', 'ar': 'ar-SA'
+            };
+            speechConfig.speechSynthesisLanguage = langMap[language] || 'en-US';
+        } else if (language) {
+            speechConfig.speechSynthesisLanguage = language;
+        }
+
+        const synthesizer = new sdk.SpeechSynthesizer(speechConfig, null);
+
+        synthesizer.speakTextAsync(
+            text,
+            result => {
+                synthesizer.close();
+                if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
+                    res.set('Content-Type', 'audio/wav');
+                    res.send(Buffer.from(result.audioData));
+                } else {
+                    res.status(500).send(`Speech synthesis canceled: ${result.errorDetails}`);
+                }
+            },
+            error => {
+                synthesizer.close();
+                res.status(500).send(error.toString());
+            }
+        );
+    } catch (error) {
+        res.status(500).send("Error synthesizing speech: " + error.message);
+    }
+});
+
+// --- DeleteHistoryEntry ---
+app.delete('/api/DeleteHistoryEntry', async (req, res) => {
+    try {
+        const { partitionKey, rowKey } = req.query;
+        if (!partitionKey || !rowKey) return res.status(400).send("Missing query parameters.");
+
+        const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+        if (!connectionString) return res.status(500).send("Storage connection string missing.");
+
+        const tableClient = TableClient.fromConnectionString(connectionString, "TranslationHistory");
+        await tableClient.deleteEntity(partitionKey, rowKey);
+
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).send("Error deleting history entry: " + error.message);
+    }
+});
+
+// --- GenAI Functions Helper ---
+const getGeminiModel = () => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("Gemini API key is not configured.");
+    const genAI = new GoogleGenerativeAI(apiKey);
+    return genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+};
+
+// --- RefineTranslation ---
+app.post('/api/RefineTranslation', async (req, res) => {
+    try {
+        const { text, targetLanguage, tone } = req.body;
+        if (!text || !targetLanguage || !tone) return res.status(400).send("Missing fields.");
+
+        const model = getGeminiModel();
+        const prompt = `You are an expert translator and linguist. Rewrite the following text in ${targetLanguage} to have a ${tone} tone. Keep the core meaning exact but change the style and vocabulary to match the requested tone. Only return the rewritten text, without any conversational filler, explanations, or quotes.\n\nOriginal text: ${text}`;
+        
+        const result = await model.generateContent(prompt);
+        res.json({ originalText: text, refinedText: result.response.text().trim(), tone });
+    } catch (error) {
+        res.status(500).send("Error during AI refinement: " + error.message);
+    }
+});
+
+// --- ExplainTranslation ---
+app.post('/api/ExplainTranslation', async (req, res) => {
+    try {
+        const { originalText, translatedText, sourceLanguage, targetLanguage } = req.body;
+        if (!originalText || !translatedText || !targetLanguage) return res.status(400).send("Missing fields.");
+
+        const model = getGeminiModel();
+        const prompt = `You are an expert linguist and cultural guide. The user translated the following text from ${sourceLanguage || 'an unknown language'} to ${targetLanguage}.\n\nOriginal Text: "${originalText}"\nTranslated Text: "${translatedText}"\n\nExplain any interesting idioms, cultural nuances, or notable grammar choices in this translation. Keep the explanation concise (2-3 short paragraphs maximum), educational, and easy to understand. Do not repeat the prompt.`;
+        
+        const result = await model.generateContent(prompt);
+        res.json({ explanation: result.response.text().trim() });
+    } catch (error) {
+        res.status(500).send("Error during AI explanation: " + error.message);
+    }
+});
+
+// --- GenerateConversationStarters ---
+app.post('/api/GenerateConversationStarters', async (req, res) => {
+    try {
+        const { translatedText, targetLanguage } = req.body;
+        if (!translatedText || !targetLanguage) return res.status(400).send("Missing fields.");
+
+        const model = getGeminiModel();
+        const prompt = `Based on the following statement translated into ${targetLanguage}: "${translatedText}"\n\nSuggest 3 natural follow-up phrases or questions that someone might say next in a conversation. \nOutput MUST be valid JSON in the following format:\n[\n  { "targetPhrase": "...", "sourceTranslation": "..." },\n  { "targetPhrase": "...", "sourceTranslation": "..." },\n  { "targetPhrase": "...", "sourceTranslation": "..." }\n]\nDo not include any Markdown formatting or text outside the JSON array.`;
+        
+        const result = await model.generateContent(prompt);
+        let responseText = result.response.text().trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+        
+        const starters = JSON.parse(responseText);
+        res.json({ starters });
+    } catch (error) {
+        res.status(500).send("Error generating conversation starters: " + error.message);
+    }
+});
+
+// --- OptimizeSourceText ---
+app.post('/api/OptimizeSourceText', async (req, res) => {
+    try {
+        const { text } = req.body;
+        if (!text) return res.status(400).send("Missing 'text' field.");
+
+        const model = getGeminiModel();
+        const prompt = `You are an expert copyeditor. Rewrite the following text to fix any grammar errors, improve punctuation, and enhance clarity. \nKeep the core meaning exactly the same. Do not translate the text. Do not add any conversational filler. Return ONLY the improved text.\n\nOriginal text:\n"${text}"`;
+        
+        const result = await model.generateContent(prompt);
+        res.json({ originalText: text, optimizedText: result.response.text().trim() });
+    } catch (error) {
+        res.status(500).send("Error during AI source optimization: " + error.message);
+    }
+});
+
+// --- GetTopicLinks ---
+app.post('/api/GetTopicLinks', async (req, res) => {
+    try {
+        const { text, language } = req.body;
+        if (!text) return res.status(400).send("Missing 'text' field.");
+
+        const model = getGeminiModel();
+        const prompt = `Analyze the following text (written in ${language || 'unknown language'}): "${text}"\n\nIdentify the primary entities, locations, or topics mentioned in the text.\nGenerate 4 to 6 highly relevant, diverse web links related to these topics. \nCRITICAL: Do NOT just return Wikipedia links. Provide a rich variety of sources similar to a search engine results page. Include official websites, major news outlets, travel/tourism boards, or educational resources.\n\nOutput MUST be valid JSON in the following format:\n[\n  { "title": "...", "url": "...", "description": "..." },\n  { "title": "...", "url": "...", "description": "..." }\n]\nEnsure the URLs are realistic, diverse, and correctly formatted.\nDo not include any Markdown formatting or text outside the JSON array.`;
+        
+        const result = await model.generateContent(prompt);
+        let responseText = result.response.text().trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+        
+        const links = JSON.parse(responseText);
+        res.json({ links });
+    } catch (error) {
+        res.status(500).send("Error generating topic links: " + error.message);
+    }
+});
+
+// --- Serve Frontend React Build ---
+// Serve static files from the React build directory
+app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+// Catch-all to serve index.html for React Router
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../frontend/dist', 'index.html'));
+});
+
+app.listen(port, () => {
+    console.log(`Express server listening on port ${port}`);
+});

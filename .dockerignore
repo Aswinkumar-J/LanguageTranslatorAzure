@@ -1,0 +1,7 @@
+node_modules
+.git
+.github
+.env
+local.settings.json
+*.log
+api/src/functions/
