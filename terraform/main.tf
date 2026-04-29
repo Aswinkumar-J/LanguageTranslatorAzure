@@ -67,6 +67,30 @@ resource "azurerm_cognitive_account" "speech" {
   sku_name            = "F0"
 }
 
+resource "azurerm_cognitive_account" "openai" {
+  name                = var.cognitive_openai_name
+  location            = var.openai_location
+  resource_group_name = azurerm_resource_group.rg.name
+  kind                = "OpenAI"
+  sku_name            = "S0"
+  
+  custom_subdomain_name = var.cognitive_openai_name
+}
+
+resource "azurerm_cognitive_deployment" "gpt" {
+  name                 = var.openai_deployment_name
+  cognitive_account_id = azurerm_cognitive_account.openai.id
+  model {
+    format  = "OpenAI"
+    name    = "gpt-4o" # You can adjust this to gpt-35-turbo if needed
+    version = "2024-05-13"
+  }
+  scale {
+    type     = "Standard"
+    capacity = 10
+  }
+}
+
 resource "azurerm_key_vault" "vault" {
   name                        = var.key_vault_name
   location                    = var.secondary_location
@@ -101,8 +125,16 @@ resource "azurerm_container_app" "app" {
       memory = "1Gi"
 
       env {
-        name  = "GEMINI_API_KEY"
-        value = var.gemini_api_key
+        name  = "AZURE_OPENAI_ENDPOINT"
+        value = azurerm_cognitive_account.openai.endpoint
+      }
+      env {
+        name  = "AZURE_OPENAI_KEY"
+        value = azurerm_cognitive_account.openai.primary_access_key
+      }
+      env {
+        name  = "AZURE_OPENAI_DEPLOYMENT_NAME"
+        value = var.openai_deployment_name
       }
       env {
         name  = "TRANSLATOR_KEY"

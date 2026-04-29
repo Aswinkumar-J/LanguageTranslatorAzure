@@ -77,6 +77,11 @@ h1, h2, h3, h4 {
   display: flex;
   flex-direction: column;
   gap: 2rem;
+  min-width: 0;
+}
+
+.sidebar-content {
+  min-width: 0;
 }
 
 .card {
@@ -125,6 +130,7 @@ h1, h2, h3, h4 {
   display: flex;
   gap: 1rem;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .modern-select {
@@ -215,6 +221,8 @@ h1, h2, h3, h4 {
   line-height: 1.6;
   color: #f1f5f9;
   white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .scrollable-text {

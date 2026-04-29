@@ -58,6 +58,24 @@ variable "cognitive_speech_name" {
   default     = "language-speech"
 }
 
+variable "cognitive_openai_name" {
+  description = "Name of the Azure OpenAI account"
+  type        = string
+  default     = "language-openai"
+}
+
+variable "openai_location" {
+  description = "Location for Azure OpenAI (East US is recommended for GPT-4o)"
+  type        = string
+  default     = "eastus"
+}
+
+variable "openai_deployment_name" {
+  description = "Name of the model deployment"
+  type        = string
+  default     = "gpt-4o"
+}
+
 variable "key_vault_name" {
   description = "Name of the Key Vault"
   type        = string
@@ -83,11 +101,7 @@ variable "speech_key" {
   sensitive   = true
 }
 
-variable "gemini_api_key" {
-  description = "Key for the Gemini API"
-  type        = string
-  sensitive   = true
-}
+
 
 variable "storage_connection_string" {
   description = "Connection string for the Storage Account"

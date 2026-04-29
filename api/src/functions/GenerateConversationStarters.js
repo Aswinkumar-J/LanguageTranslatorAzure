@@ -1,5 +1,5 @@
 const { app } = require('@azure/functions');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { AzureOpenAI } = require('openai');
 
 app.http('GenerateConversationStarters', {
     methods: ['POST'],
@@ -13,13 +13,19 @@ app.http('GenerateConversationStarters', {
                 return { status: 400, body: "Missing 'translatedText' or 'targetLanguage' field." };
             }
 
-            const apiKey = process.env.GEMINI_API_KEY;
-            if (!apiKey) {
-                return { status: 500, body: "Gemini API key is not configured." };
+            const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+            const apiKey = process.env.AZURE_OPENAI_KEY;
+            const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT_NAME;
+
+            if (!endpoint || !apiKey || !deploymentName) {
+                return { status: 500, body: "Azure OpenAI configuration is missing." };
             }
 
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            const client = new AzureOpenAI({
+                apiKey: apiKey,
+                endpoint: endpoint,
+                apiVersion: "2024-10-21"
+            });
 
             const prompt = `Based on the following statement translated into ${targetLanguage}: "${translatedText}"
 
@@ -32,8 +38,11 @@ Output MUST be valid JSON in the following format:
 ]
 Do not include any Markdown formatting or text outside the JSON array.`;
 
-            const result = await model.generateContent(prompt);
-            let responseText = result.response.text().trim();
+            const result = await client.chat.completions.create({
+                model: deploymentName,
+                messages: [{ role: "user", content: prompt }]
+            });
+            let responseText = result.choices[0].message.content.trim();
             
             // Clean up any potential markdown code blocks
             if (responseText.startsWith('```json')) {

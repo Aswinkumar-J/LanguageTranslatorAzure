@@ -1,5 +1,5 @@
 const { app } = require('@azure/functions');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { AzureOpenAI } = require('openai');
 
 app.http('OptimizeSourceText', {
     methods: ['POST'],
@@ -13,13 +13,19 @@ app.http('OptimizeSourceText', {
                 return { status: 400, body: "Missing 'text' field." };
             }
 
-            const apiKey = process.env.GEMINI_API_KEY;
-            if (!apiKey) {
-                return { status: 500, body: "Gemini API key is not configured." };
+            const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+            const apiKey = process.env.AZURE_OPENAI_KEY;
+            const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT_NAME;
+
+            if (!endpoint || !apiKey || !deploymentName) {
+                return { status: 500, body: "Azure OpenAI configuration is missing." };
             }
 
-            const genAI = new GoogleGenerativeAI(apiKey);
-            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            const client = new AzureOpenAI({
+                apiKey: apiKey,
+                endpoint: endpoint,
+                apiVersion: "2024-10-21"
+            });
 
             const prompt = `You are an expert copyeditor. Rewrite the following text to fix any grammar errors, improve punctuation, and enhance clarity. 
 Keep the core meaning exactly the same. Do not translate the text. Do not add any conversational filler. Return ONLY the improved text.
@@ -27,8 +33,11 @@ Keep the core meaning exactly the same. Do not translate the text. Do not add an
 Original text:
 "${text}"`;
 
-            const result = await model.generateContent(prompt);
-            const optimizedText = result.response.text().trim();
+            const result = await client.chat.completions.create({
+                model: deploymentName,
+                messages: [{ role: "user", content: prompt }]
+            });
+            const optimizedText = result.choices[0].message.content.trim();
 
             return {
                 jsonBody: {

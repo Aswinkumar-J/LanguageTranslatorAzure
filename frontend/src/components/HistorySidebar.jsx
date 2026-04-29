@@ -49,6 +49,23 @@ export default function HistorySidebar({ refreshTrigger }) {
         currentPage * ITEMS_PER_PAGE
     );
 
+    const getPageNumbers = () => {
+        const maxVisible = 5;
+        if (totalPages <= maxVisible) {
+            return [...Array(totalPages)].map((_, i) => i + 1);
+        }
+
+        let start = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+        let end = start + maxVisible - 1;
+
+        if (end > totalPages) {
+            end = totalPages;
+            start = Math.max(1, end - maxVisible + 1);
+        }
+
+        return [...Array(end - start + 1)].map((_, i) => start + i);
+    };
+
     return (
         <>
             <div className="card history-sidebar glass-panel">
@@ -91,13 +108,13 @@ export default function HistorySidebar({ refreshTrigger }) {
                             Prev
                         </button>
                         
-                        {[...Array(totalPages)].map((_, index) => (
+                        {getPageNumbers().map((pageNumber) => (
                             <button 
-                                key={index + 1}
-                                className={`pagination-btn ${currentPage === index + 1 ? 'active' : ''}`}
-                                onClick={() => setCurrentPage(index + 1)}
+                                key={pageNumber}
+                                className={`pagination-btn ${currentPage === pageNumber ? 'active' : ''}`}
+                                onClick={() => setCurrentPage(pageNumber)}
                             >
-                                {index + 1}
+                                {pageNumber}
                             </button>
                         ))}
 

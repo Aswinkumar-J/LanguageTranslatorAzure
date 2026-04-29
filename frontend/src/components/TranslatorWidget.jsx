@@ -48,6 +48,14 @@ export default function TranslatorWidget({ onTranslationSaved }) {
         if (!text.trim()) return;
         setLoading(true);
         setError(null);
+        
+        // Clear previous auxiliary results
+        setResult(null);
+        setRefinedResult(null);
+        setExplanation(null);
+        setStarters([]);
+        setTopicLinks([]);
+
         try {
             const data = await translateText(text, targetLang);
             setResult(data);

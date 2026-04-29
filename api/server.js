@@ -6,7 +6,7 @@ const { v4: uuidv4 } = require('uuid');
 const { TableClient } = require('@azure/data-tables');
 const pdf = require('pdf-parse');
 const sdk = require('microsoft-cognitiveservices-speech-sdk');
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { AzureOpenAI } = require('openai');
 const path = require('path');
 const fs = require('fs');
 
@@ -268,12 +268,22 @@ app.delete('/api/DeleteHistoryEntry', async (req, res) => {
     }
 });
 
-// --- GenAI Functions Helper ---
-const getGeminiModel = () => {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("Gemini API key is not configured.");
-    const genAI = new GoogleGenerativeAI(apiKey);
-    return genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+// --- Azure OpenAI client helper ---
+const getOpenAIClient = () => {
+    const endpoint = process.env.AZURE_OPENAI_ENDPOINT;
+    const apiKey = process.env.AZURE_OPENAI_KEY;
+    if (!endpoint || !apiKey) throw new Error("Azure OpenAI endpoint or key is not configured.");
+    return new AzureOpenAI({
+        apiKey: apiKey,
+        endpoint: endpoint,
+        apiVersion: "2024-10-21"
+    });
+};
+
+const getDeploymentName = () => {
+    const deploymentName = process.env.AZURE_OPENAI_DEPLOYMENT_NAME;
+    if (!deploymentName) throw new Error("Azure OpenAI deployment name is not configured.");
+    return deploymentName;
 };
 
 // --- RefineTranslation ---
@@ -282,11 +292,16 @@ app.post('/api/RefineTranslation', async (req, res) => {
         const { text, targetLanguage, tone } = req.body;
         if (!text || !targetLanguage || !tone) return res.status(400).send("Missing fields.");
 
-        const model = getGeminiModel();
+        const client = getOpenAIClient();
+        const deploymentName = getDeploymentName();
         const prompt = `You are an expert translator and linguist. Rewrite the following text in ${targetLanguage} to have a ${tone} tone. Keep the core meaning exact but change the style and vocabulary to match the requested tone. Only return the rewritten text, without any conversational filler, explanations, or quotes.\n\nOriginal text: ${text}`;
         
-        const result = await model.generateContent(prompt);
-        res.json({ originalText: text, refinedText: result.response.text().trim(), tone });
+        const result = await client.chat.completions.create({
+            model: deploymentName,
+            messages: [{ role: "user", content: prompt }]
+        });
+        const responseText = result.choices[0].message.content.trim();
+        res.json({ originalText: text, refinedText: responseText, tone });
     } catch (error) {
         res.status(500).send("Error during AI refinement: " + error.message);
     }
@@ -298,11 +313,16 @@ app.post('/api/ExplainTranslation', async (req, res) => {
         const { originalText, translatedText, sourceLanguage, targetLanguage } = req.body;
         if (!originalText || !translatedText || !targetLanguage) return res.status(400).send("Missing fields.");
 
-        const model = getGeminiModel();
+        const client = getOpenAIClient();
+        const deploymentName = getDeploymentName();
         const prompt = `You are an expert linguist and cultural guide. The user translated the following text from ${sourceLanguage || 'an unknown language'} to ${targetLanguage}.\n\nOriginal Text: "${originalText}"\nTranslated Text: "${translatedText}"\n\nExplain any interesting idioms, cultural nuances, or notable grammar choices in this translation. Keep the explanation concise (2-3 short paragraphs maximum), educational, and easy to understand. Do not repeat the prompt.`;
         
-        const result = await model.generateContent(prompt);
-        res.json({ explanation: result.response.text().trim() });
+        const result = await client.chat.completions.create({
+            model: deploymentName,
+            messages: [{ role: "user", content: prompt }]
+        });
+        const responseText = result.choices[0].message.content.trim();
+        res.json({ explanation: responseText });
     } catch (error) {
         res.status(500).send("Error during AI explanation: " + error.message);
     }
@@ -314,11 +334,15 @@ app.post('/api/GenerateConversationStarters', async (req, res) => {
         const { translatedText, targetLanguage } = req.body;
         if (!translatedText || !targetLanguage) return res.status(400).send("Missing fields.");
 
-        const model = getGeminiModel();
+        const client = getOpenAIClient();
+        const deploymentName = getDeploymentName();
         const prompt = `Based on the following statement translated into ${targetLanguage}: "${translatedText}"\n\nSuggest 3 natural follow-up phrases or questions that someone might say next in a conversation. \nOutput MUST be valid JSON in the following format:\n[\n  { "targetPhrase": "...", "sourceTranslation": "..." },\n  { "targetPhrase": "...", "sourceTranslation": "..." },\n  { "targetPhrase": "...", "sourceTranslation": "..." }\n]\nDo not include any Markdown formatting or text outside the JSON array.`;
         
-        const result = await model.generateContent(prompt);
-        let responseText = result.response.text().trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+        const result = await client.chat.completions.create({
+            model: deploymentName,
+            messages: [{ role: "user", content: prompt }]
+        });
+        let responseText = result.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
         
         const starters = JSON.parse(responseText);
         res.json({ starters });
@@ -333,11 +357,16 @@ app.post('/api/OptimizeSourceText', async (req, res) => {
         const { text } = req.body;
         if (!text) return res.status(400).send("Missing 'text' field.");
 
-        const model = getGeminiModel();
+        const client = getOpenAIClient();
+        const deploymentName = getDeploymentName();
         const prompt = `You are an expert copyeditor. Rewrite the following text to fix any grammar errors, improve punctuation, and enhance clarity. \nKeep the core meaning exactly the same. Do not translate the text. Do not add any conversational filler. Return ONLY the improved text.\n\nOriginal text:\n"${text}"`;
         
-        const result = await model.generateContent(prompt);
-        res.json({ originalText: text, optimizedText: result.response.text().trim() });
+        const result = await client.chat.completions.create({
+            model: deploymentName,
+            messages: [{ role: "user", content: prompt }]
+        });
+        const responseText = result.choices[0].message.content.trim();
+        res.json({ originalText: text, optimizedText: responseText });
     } catch (error) {
         res.status(500).send("Error during AI source optimization: " + error.message);
     }
@@ -349,11 +378,15 @@ app.post('/api/GetTopicLinks', async (req, res) => {
         const { text, language } = req.body;
         if (!text) return res.status(400).send("Missing 'text' field.");
 
-        const model = getGeminiModel();
+        const client = getOpenAIClient();
+        const deploymentName = getDeploymentName();
         const prompt = `Analyze the following text (written in ${language || 'unknown language'}): "${text}"\n\nIdentify the primary entities, locations, or topics mentioned in the text.\nGenerate 4 to 6 highly relevant Wikipedia links related to these topics. \n\nOutput MUST be valid JSON in the following format:\n[\n  { "title": "...", "url": "...", "description": "..." },\n  { "title": "...", "url": "...", "description": "..." }\n]\nEnsure the URLs are valid Wikipedia links and correctly formatted.\nDo not include any Markdown formatting or text outside the JSON array.`;
         
-        const result = await model.generateContent(prompt);
-        let responseText = result.response.text().trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
+        const result = await client.chat.completions.create({
+            model: deploymentName,
+            messages: [{ role: "user", content: prompt }]
+        });
+        let responseText = result.choices[0].message.content.trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
         
         const links = JSON.parse(responseText);
         res.json({ links });
