@@ -74,7 +74,7 @@ resource "azurerm_cognitive_account" "openai" {
   kind                = "OpenAI"
   sku_name            = "S0"
   
-  custom_subdomain_name = var.cognitive_openai_name
+  custom_subdomain_name = lower(var.cognitive_openai_name)
 }
 
 resource "azurerm_cognitive_deployment" "gpt" {
@@ -82,12 +82,12 @@ resource "azurerm_cognitive_deployment" "gpt" {
   cognitive_account_id = azurerm_cognitive_account.openai.id
   model {
     format  = "OpenAI"
-    name    = "gpt-4o" # You can adjust this to gpt-35-turbo if needed
-    version = "2024-05-13"
+    name    = "gpt-5.4" 
+    version = "2026-03-05"
   }
   scale {
-    type     = "Standard"
-    capacity = 10
+    type     = "GlobalStandard"
+    capacity = 150
   }
 }
 

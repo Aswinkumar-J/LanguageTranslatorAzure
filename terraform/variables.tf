@@ -61,19 +61,19 @@ variable "cognitive_speech_name" {
 variable "cognitive_openai_name" {
   description = "Name of the Azure OpenAI account"
   type        = string
-  default     = "language-openai"
+  default     = "LanguageOpenAI"
 }
 
 variable "openai_location" {
-  description = "Location for Azure OpenAI (East US is recommended for GPT-4o)"
+  description = "Location for Azure OpenAI"
   type        = string
-  default     = "eastus"
+  default     = "southeastasia"
 }
 
 variable "openai_deployment_name" {
   description = "Name of the model deployment"
   type        = string
-  default     = "gpt-4o"
+  default     = "gpt-5.4"
 }
 
 variable "key_vault_name" {
