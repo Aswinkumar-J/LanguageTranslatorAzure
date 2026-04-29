@@ -8,6 +8,24 @@ const pdf = require('pdf-parse');
 const sdk = require('microsoft-cognitiveservices-speech-sdk');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const path = require('path');
+const fs = require('fs');
+
+// Load local.settings.json for local development
+if (process.env.NODE_ENV !== 'production') {
+    const localSettingsPath = path.join(__dirname, 'local.settings.json');
+    if (fs.existsSync(localSettingsPath)) {
+        try {
+            const localSettings = JSON.parse(fs.readFileSync(localSettingsPath, 'utf8'));
+            if (localSettings.Values) {
+                Object.assign(process.env, localSettings.Values);
+                console.log('Loaded environment variables from local.settings.json');
+            }
+        } catch (err) {
+            console.warn('Failed to parse local.settings.json:', err.message);
+        }
+    }
+}
+
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -332,7 +350,7 @@ app.post('/api/GetTopicLinks', async (req, res) => {
         if (!text) return res.status(400).send("Missing 'text' field.");
 
         const model = getGeminiModel();
-        const prompt = `Analyze the following text (written in ${language || 'unknown language'}): "${text}"\n\nIdentify the primary entities, locations, or topics mentioned in the text.\nGenerate 4 to 6 highly relevant, diverse web links related to these topics. \nCRITICAL: Do NOT just return Wikipedia links. Provide a rich variety of sources similar to a search engine results page. Include official websites, major news outlets, travel/tourism boards, or educational resources.\n\nOutput MUST be valid JSON in the following format:\n[\n  { "title": "...", "url": "...", "description": "..." },\n  { "title": "...", "url": "...", "description": "..." }\n]\nEnsure the URLs are realistic, diverse, and correctly formatted.\nDo not include any Markdown formatting or text outside the JSON array.`;
+        const prompt = `Analyze the following text (written in ${language || 'unknown language'}): "${text}"\n\nIdentify the primary entities, locations, or topics mentioned in the text.\nGenerate 4 to 6 highly relevant Wikipedia links related to these topics. \n\nOutput MUST be valid JSON in the following format:\n[\n  { "title": "...", "url": "...", "description": "..." },\n  { "title": "...", "url": "...", "description": "..." }\n]\nEnsure the URLs are valid Wikipedia links and correctly formatted.\nDo not include any Markdown formatting or text outside the JSON array.`;
         
         const result = await model.generateContent(prompt);
         let responseText = result.response.text().trim().replace(/^```json/, '').replace(/^```/, '').replace(/```$/, '').trim();
