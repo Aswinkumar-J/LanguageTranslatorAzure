@@ -104,13 +104,72 @@ resource "azurerm_key_vault" "vault" {
   sku_name = "standard"
 }
 
+resource "azurerm_key_vault_secret" "openai_key" {
+  name         = "openai-key"
+  value        = azurerm_cognitive_account.openai.primary_access_key
+  key_vault_id = azurerm_key_vault.vault.id
+}
+
+resource "azurerm_key_vault_secret" "translator_key" {
+  name         = "translator-key"
+  value        = var.translator_key
+  key_vault_id = azurerm_key_vault.vault.id
+}
+
+resource "azurerm_key_vault_secret" "speech_key" {
+  name         = "speech-key"
+  value        = var.speech_key
+  key_vault_id = azurerm_key_vault.vault.id
+}
+
+resource "azurerm_key_vault_secret" "storage_connection_string" {
+  name         = "storage-connection-string"
+  value        = var.storage_connection_string
+  key_vault_id = azurerm_key_vault.vault.id
+}
+
 data "azurerm_client_config" "current" {}
+
+resource "azurerm_user_assigned_identity" "aca_identity" {
+  name                = "${var.container_app_name}-identity"
+  location            = var.secondary_location
+  resource_group_name = azurerm_resource_group.rg.name
+}
 
 resource "azurerm_container_app" "app" {
   name                         = var.container_app_name
   container_app_environment_id = azurerm_container_app_environment.ace.id
   resource_group_name          = azurerm_resource_group.rg.name
   revision_mode                = "Single"
+
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.aca_identity.id]
+  }
+
+  secret {
+    name                = "openai-key"
+    key_vault_secret_id = azurerm_key_vault_secret.openai_key.versionless_id
+    identity            = azurerm_user_assigned_identity.aca_identity.id
+  }
+
+  secret {
+    name                = "translator-key"
+    key_vault_secret_id = azurerm_key_vault_secret.translator_key.versionless_id
+    identity            = azurerm_user_assigned_identity.aca_identity.id
+  }
+
+  secret {
+    name                = "speech-key"
+    key_vault_secret_id = azurerm_key_vault_secret.speech_key.versionless_id
+    identity            = azurerm_user_assigned_identity.aca_identity.id
+  }
+
+  secret {
+    name                = "storage-connection-string"
+    key_vault_secret_id = azurerm_key_vault_secret.storage_connection_string.versionless_id
+    identity            = azurerm_user_assigned_identity.aca_identity.id
+  }
 
   registry {
     server   = "${var.acr_name}.azurecr.io"
@@ -130,7 +189,7 @@ resource "azurerm_container_app" "app" {
       }
       env {
         name  = "AZURE_OPENAI_KEY"
-        value = azurerm_cognitive_account.openai.primary_access_key
+        secret_name = "openai-key"
       }
       env {
         name  = "AZURE_OPENAI_DEPLOYMENT_NAME"
@@ -138,7 +197,7 @@ resource "azurerm_container_app" "app" {
       }
       env {
         name  = "TRANSLATOR_KEY"
-        value = var.translator_key
+        secret_name = "translator-key"
       }
       env {
         name  = "TRANSLATOR_ENDPOINT"
@@ -150,7 +209,7 @@ resource "azurerm_container_app" "app" {
       }
       env {
         name  = "SPEECH_KEY"
-        value = var.speech_key
+        secret_name = "speech-key"
       }
       env {
         name  = "SPEECH_REGION"
@@ -158,7 +217,7 @@ resource "azurerm_container_app" "app" {
       }
       env {
         name  = "AZURE_STORAGE_CONNECTION_STRING"
-        value = var.storage_connection_string
+        secret_name = "storage-connection-string"
       }
       env {
         name  = "PORT"
@@ -176,4 +235,15 @@ resource "azurerm_container_app" "app" {
       latest_revision = true
     }
   }
+}
+resource "azurerm_role_assignment" "containerapp_kv_secrets" {
+  scope                = azurerm_key_vault.vault.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_user_assigned_identity.aca_identity.principal_id
+}
+
+resource "azurerm_role_assignment" "current_user_kv_officer" {
+  scope                = azurerm_key_vault.vault.id
+  role_definition_name = "Key Vault Secrets Officer"
+  principal_id         = data.azurerm_client_config.current.object_id
 }
