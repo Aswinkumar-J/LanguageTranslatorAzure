@@ -88,6 +88,12 @@ variable "log_analytics_workspace_name" {
   default     = "workspacecloudprojectrgb8d3"
 }
 
+variable "application_insights_name" {
+  description = "Name of the Application Insights resource"
+  type        = string
+  default     = "translator-app-insights"
+}
+
 # Sensitive variables for secrets
 variable "translator_key" {
   description = "Key for the Translator service"

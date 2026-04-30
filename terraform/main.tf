@@ -22,6 +22,14 @@ resource "azurerm_log_analytics_workspace" "logs" {
   retention_in_days   = 30
 }
 
+resource "azurerm_application_insights" "insights" {
+  name                = var.application_insights_name
+  location            = var.secondary_location
+  resource_group_name = azurerm_resource_group.rg.name
+  workspace_id        = azurerm_log_analytics_workspace.logs.id
+  application_type    = "web"
+}
+
 resource "azurerm_container_app_environment" "ace" {
   name                       = var.container_app_environment_name
   location                   = var.secondary_location
@@ -223,6 +231,10 @@ resource "azurerm_container_app" "app" {
         name  = "PORT"
         value = "3000"
       }
+      env {
+        name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
+        value = azurerm_application_insights.insights.connection_string
+      }
     }
   }
 
@@ -246,4 +258,73 @@ resource "azurerm_role_assignment" "current_user_kv_officer" {
   scope                = azurerm_key_vault.vault.id
   role_definition_name = "Key Vault Secrets Officer"
   principal_id         = data.azurerm_client_config.current.object_id
+}
+
+resource "azurerm_monitor_diagnostic_setting" "openai_diag" {
+  name                       = "openai-diagnostics"
+  target_resource_id         = azurerm_cognitive_account.openai.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.logs.id
+
+  enabled_log {
+    category = "Audit"
+  }
+  enabled_log {
+    category = "RequestResponse"
+  }
+
+  metric {
+    category = "AllMetrics"
+    enabled  = true
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "translator_diag" {
+  name                       = "translator-diagnostics"
+  target_resource_id         = azurerm_cognitive_account.translator.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.logs.id
+
+  enabled_log {
+    category = "Audit"
+  }
+  enabled_log {
+    category = "RequestResponse"
+  }
+
+  metric {
+    category = "AllMetrics"
+    enabled  = true
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "speech_diag" {
+  name                       = "speech-diagnostics"
+  target_resource_id         = azurerm_cognitive_account.speech.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.logs.id
+
+  enabled_log {
+    category = "Audit"
+  }
+  enabled_log {
+    category = "RequestResponse"
+  }
+
+  metric {
+    category = "AllMetrics"
+    enabled  = true
+  }
+}
+
+resource "azurerm_monitor_diagnostic_setting" "kv_diag" {
+  name                       = "kv-diagnostics"
+  target_resource_id         = azurerm_key_vault.vault.id
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.logs.id
+
+  enabled_log {
+    category = "AuditEvent"
+  }
+
+  metric {
+    category = "AllMetrics"
+    enabled  = true
+  }
 }
