@@ -16,7 +16,7 @@ function App() {
   useEffect(() => {
     if (isAuthenticated && accounts.length > 0) {
       const request = {
-        scopes: [`api://${import.meta.env.VITE_ENTRA_ID_CLIENT_ID}/access_as_user`],
+        scopes: [`api://${instance.config.auth.clientId}/access_as_user`],
         account: accounts[0]
       };
 
@@ -53,7 +53,7 @@ function App() {
   const handleLogin = () => {
     setAuthError(null);
     instance.loginPopup({
-      scopes: [`api://${import.meta.env.VITE_ENTRA_ID_CLIENT_ID}/access_as_user`],
+      scopes: [`api://${instance.config.auth.clientId}/access_as_user`],
     }).then(response => {
       setAuthToken(response.accessToken);
       setTimeout(() => {
