@@ -158,7 +158,8 @@ resource "azuread_application" "auth_app" {
 
   single_page_application {
     redirect_uris = [
-      "http://localhost:5173/"
+      "http://localhost:5173/",
+      "https://languagecontainer.ambitiousbush-91dcd67b.centralindia.azurecontainerapps.io/"
     ]
   }
 
