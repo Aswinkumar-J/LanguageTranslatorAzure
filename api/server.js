@@ -61,6 +61,14 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Public config endpoint for frontend to get Entra ID settings at runtime
+app.get('/api/config', (req, res) => {
+    res.json({
+        clientId: process.env.ENTRA_ID_CLIENT_ID,
+        tenantId: process.env.ENTRA_ID_TENANT_ID
+    });
+});
+
 // --- Microsoft Entra ID Authentication ---
 if (process.env.ENTRA_ID_CLIENT_ID && process.env.ENTRA_ID_TENANT_ID) {
     const options = {
