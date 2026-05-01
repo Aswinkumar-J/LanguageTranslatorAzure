@@ -2,8 +2,23 @@ import axios from 'axios';
 
 const API_BASE = '/api';
 
+let authToken = null;
+
+export const setAuthToken = (token) => {
+    authToken = token;
+    if (token) {
+        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    } else {
+        delete api.defaults.headers.common['Authorization'];
+    }
+};
+
+const api = axios.create({
+    baseURL: API_BASE
+});
+
 export const translateText = async (text, targetLanguage) => {
-    const response = await axios.post(`${API_BASE}/TranslateText`, { text, targetLanguage });
+    const response = await api.post('/TranslateText', { text, targetLanguage });
     return response.data;
 };
 
@@ -12,53 +27,52 @@ export const processDocument = async (file, targetLanguage) => {
     formData.append('file', file);
     formData.append('targetLanguage', targetLanguage);
     
-    const response = await axios.post(`${API_BASE}/ProcessDocument`, formData, {
+    const response = await api.post('/ProcessDocument', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
     });
     return response.data;
 };
 
 export const synthesizeSpeech = async (text, language) => {
-    const response = await axios.post(`${API_BASE}/SynthesizeSpeech`, { text, language }, {
+    const response = await api.post('/SynthesizeSpeech', { text, language }, {
         responseType: 'blob'
     });
-    // Create a local object URL for the audio blob
     return URL.createObjectURL(response.data);
 };
 
 export const getHistory = async () => {
-    const response = await axios.get(`${API_BASE}/GetHistory`);
+    const response = await api.get('/GetHistory');
     return response.data;
 };
 
 export const deleteHistoryEntry = async (id, type) => {
-    const response = await axios.delete(`${API_BASE}/DeleteHistoryEntry`, {
+    const response = await api.delete('/DeleteHistoryEntry', {
         params: { rowKey: id, partitionKey: type }
     });
     return response.data;
 };
 
 export const refineTranslation = async (text, targetLanguage, tone) => {
-    const response = await axios.post(`${API_BASE}/RefineTranslation`, { text, targetLanguage, tone });
+    const response = await api.post('/RefineTranslation', { text, targetLanguage, tone });
     return response.data;
 };
 
 export const explainTranslation = async (originalText, translatedText, sourceLanguage, targetLanguage) => {
-    const response = await axios.post(`${API_BASE}/ExplainTranslation`, { originalText, translatedText, sourceLanguage, targetLanguage });
+    const response = await api.post('/ExplainTranslation', { originalText, translatedText, sourceLanguage, targetLanguage });
     return response.data;
 };
 
 export const generateConversationStarters = async (translatedText, targetLanguage) => {
-    const response = await axios.post(`${API_BASE}/GenerateConversationStarters`, { translatedText, targetLanguage });
+    const response = await api.post('/GenerateConversationStarters', { translatedText, targetLanguage });
     return response.data;
 };
 
 export const optimizeSourceText = async (text) => {
-    const response = await axios.post(`${API_BASE}/OptimizeSourceText`, { text });
+    const response = await api.post('/OptimizeSourceText', { text });
     return response.data;
 };
 
 export const getTopicLinks = async (text, language) => {
-    const response = await axios.post(`${API_BASE}/GetTopicLinks`, { text, language });
+    const response = await api.post('/GetTopicLinks', { text, language });
     return response.data;
 };

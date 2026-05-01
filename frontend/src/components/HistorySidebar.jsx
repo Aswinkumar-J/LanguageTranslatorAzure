@@ -73,7 +73,7 @@ export default function HistorySidebar({ refreshTrigger }) {
                 {loading ? (
                     <p>Loading history...</p>
                 ) : error ? (
-                    <p className="error-text">No Azure credentials found. Translation history depends on Azure Table Storage to be configured.</p>
+                    <p className="error-text">{error}</p>
                 ) : history.length === 0 ? (
                     <p className="text-muted">No translation history yet.</p>
                 ) : (

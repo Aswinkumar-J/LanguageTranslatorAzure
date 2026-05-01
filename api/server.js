@@ -25,21 +25,34 @@ const { AzureOpenAI } = require('openai');
 const path = require('path');
 const fs = require('fs');
 
-// Load local.settings.json for local development
+// Load environment variables for local development
 if (process.env.NODE_ENV !== 'production') {
-    const localSettingsPath = path.join(__dirname, 'local.settings.json');
-    if (fs.existsSync(localSettingsPath)) {
+    require('dotenv').config();
+    
+    // Fallback: also try loading from local.settings.json
+    const settingsPath = path.join(__dirname, 'local.settings.json');
+    if (fs.existsSync(settingsPath)) {
         try {
-            const localSettings = JSON.parse(fs.readFileSync(localSettingsPath, 'utf8'));
-            if (localSettings.Values) {
-                Object.assign(process.env, localSettings.Values);
-                console.log('Loaded environment variables from local.settings.json');
+            const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+            if (settings.Values) {
+                Object.keys(settings.Values).forEach(key => {
+                    if (!process.env[key]) {
+                        process.env[key] = settings.Values[key];
+                    }
+                });
             }
         } catch (err) {
-            console.warn('Failed to parse local.settings.json:', err.message);
+            console.error('Error loading local.settings.json:', err);
         }
     }
+    if (process.env.AZURE_STORAGE_CONNECTION_STRING) {
+        console.log('Storage connection string loaded successfully');
+    } else {
+        console.warn('Storage connection string is missing from environment');
+    }
 }
+const passport = require('passport');
+const BearerStrategy = require('passport-azure-ad').BearerStrategy;
 
 
 const app = express();
@@ -48,10 +61,40 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// --- Microsoft Entra ID Authentication ---
+if (process.env.ENTRA_ID_CLIENT_ID && process.env.ENTRA_ID_TENANT_ID) {
+    const options = {
+        identityMetadata: "https://login.microsoftonline.com/common/v2.0/.well-known/openid-configuration",
+        clientID: process.env.ENTRA_ID_CLIENT_ID,
+        validateIssuer: false,
+        passReqToCallback: false,
+        loggingLevel: 'info',
+        audience: [process.env.ENTRA_ID_CLIENT_ID, `api://${process.env.ENTRA_ID_CLIENT_ID}`],
+        allowMultiAudiencesInToken: true
+    };
+
+    const bearerStrategy = new BearerStrategy(options, (token, done) => {
+        return done(null, token, token);
+    });
+
+    app.use(passport.initialize());
+    passport.use(bearerStrategy);
+    console.log('Microsoft Entra ID Authentication configured');
+} else {
+    console.warn('ENTRA_ID_CLIENT_ID or ENTRA_ID_TENANT_ID not found. API is running without authentication.');
+}
+
+const authenticate = (req, res, next) => {
+    if (process.env.ENTRA_ID_CLIENT_ID && process.env.ENTRA_ID_TENANT_ID) {
+        return passport.authenticate('oauth-bearer', { session: false })(req, res, next);
+    }
+    next();
+};
+
 const upload = multer({ storage: multer.memoryStorage() });
 
 // --- TranslateText ---
-app.post('/api/TranslateText', async (req, res) => {
+app.post('/api/TranslateText', authenticate, async (req, res) => {
     try {
         const { text, targetLanguage } = req.body;
         if (!text || !targetLanguage) {
@@ -110,7 +153,7 @@ app.post('/api/TranslateText', async (req, res) => {
 });
 
 // --- GetHistory ---
-app.get('/api/GetHistory', async (req, res) => {
+app.get('/api/GetHistory', authenticate, async (req, res) => {
     try {
         const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
         if (!connectionString) return res.status(500).send("Storage connection string is missing.");
@@ -143,7 +186,7 @@ app.get('/api/GetHistory', async (req, res) => {
 });
 
 // --- ProcessDocument ---
-app.post('/api/ProcessDocument', upload.single('file'), async (req, res) => {
+app.post('/api/ProcessDocument', authenticate, upload.single('file'), async (req, res) => {
     try {
         const file = req.file;
         const targetLanguage = req.body.targetLanguage;
@@ -219,7 +262,7 @@ app.post('/api/ProcessDocument', upload.single('file'), async (req, res) => {
 });
 
 // --- SynthesizeSpeech ---
-app.post('/api/SynthesizeSpeech', async (req, res) => {
+app.post('/api/SynthesizeSpeech', authenticate, async (req, res) => {
     try {
         const { text, language } = req.body;
         if (!text) return res.status(400).send("Missing 'text' field.");
@@ -266,7 +309,7 @@ app.post('/api/SynthesizeSpeech', async (req, res) => {
 });
 
 // --- DeleteHistoryEntry ---
-app.delete('/api/DeleteHistoryEntry', async (req, res) => {
+app.delete('/api/DeleteHistoryEntry', authenticate, async (req, res) => {
     try {
         const { partitionKey, rowKey } = req.query;
         if (!partitionKey || !rowKey) return res.status(400).send("Missing query parameters.");
@@ -302,7 +345,7 @@ const getDeploymentName = () => {
 };
 
 // --- RefineTranslation ---
-app.post('/api/RefineTranslation', async (req, res) => {
+app.post('/api/RefineTranslation', authenticate, async (req, res) => {
     try {
         const { text, targetLanguage, tone } = req.body;
         if (!text || !targetLanguage || !tone) return res.status(400).send("Missing fields.");
@@ -323,7 +366,7 @@ app.post('/api/RefineTranslation', async (req, res) => {
 });
 
 // --- ExplainTranslation ---
-app.post('/api/ExplainTranslation', async (req, res) => {
+app.post('/api/ExplainTranslation', authenticate, async (req, res) => {
     try {
         const { originalText, translatedText, sourceLanguage, targetLanguage } = req.body;
         if (!originalText || !translatedText || !targetLanguage) return res.status(400).send("Missing fields.");
@@ -344,7 +387,7 @@ app.post('/api/ExplainTranslation', async (req, res) => {
 });
 
 // --- GenerateConversationStarters ---
-app.post('/api/GenerateConversationStarters', async (req, res) => {
+app.post('/api/GenerateConversationStarters', authenticate, async (req, res) => {
     try {
         const { translatedText, targetLanguage } = req.body;
         if (!translatedText || !targetLanguage) return res.status(400).send("Missing fields.");
@@ -367,7 +410,7 @@ app.post('/api/GenerateConversationStarters', async (req, res) => {
 });
 
 // --- OptimizeSourceText ---
-app.post('/api/OptimizeSourceText', async (req, res) => {
+app.post('/api/OptimizeSourceText', authenticate, async (req, res) => {
     try {
         const { text } = req.body;
         if (!text) return res.status(400).send("Missing 'text' field.");
@@ -388,7 +431,7 @@ app.post('/api/OptimizeSourceText', async (req, res) => {
 });
 
 // --- GetTopicLinks ---
-app.post('/api/GetTopicLinks', async (req, res) => {
+app.post('/api/GetTopicLinks', authenticate, async (req, res) => {
     try {
         const { text, language } = req.body;
         if (!text) return res.status(400).send("Missing 'text' field.");

@@ -63,7 +63,6 @@ resource "azurerm_cognitive_account" "translator" {
   resource_group_name = azurerm_resource_group.rg.name
   kind                = "TextTranslation"
   sku_name            = "S1"
-  
   custom_subdomain_name = var.cognitive_translator_name
 }
 
@@ -81,7 +80,6 @@ resource "azurerm_cognitive_account" "openai" {
   resource_group_name = azurerm_resource_group.rg.name
   kind                = "OpenAI"
   sku_name            = "S0"
-  
   custom_subdomain_name = lower(var.cognitive_openai_name)
 }
 
@@ -134,6 +132,50 @@ resource "azurerm_key_vault_secret" "storage_connection_string" {
   name         = "storage-connection-string"
   value        = var.storage_connection_string
   key_vault_id = azurerm_key_vault.vault.id
+}
+
+resource "azuread_application" "auth_app" {
+  display_name     = "LanguageTranslatorAuth"
+  identifier_uris  = ["api://a8d1fae3-68a9-4911-9d29-685fa82eaedf"]
+  owners           = [data.azurerm_client_config.current.object_id]
+  sign_in_audience = "AzureADandPersonalMicrosoftAccount"
+
+  api {
+    mapped_claims_enabled          = true
+    requested_access_token_version = 2
+    
+    oauth2_permission_scope {
+      admin_consent_description  = "Allow the application to access the translation services on behalf of the signed-in user."
+      admin_consent_display_name = "Access Translation Services"
+      enabled                    = true
+      id                         = "c4603943-7f21-4f10-b984-b040e0176378"
+      type                       = "User"
+      user_consent_description   = "Allow the application to access the translation services on your behalf."
+      user_consent_display_name  = "Access Translation Services"
+      value                      = "access_as_user"
+    }
+  }
+
+  single_page_application {
+    redirect_uris = [
+      "http://localhost:5173/"
+    ]
+  }
+
+  required_resource_access {
+    resource_app_id = "00000003-0000-0000-c000-000000000000" # Microsoft Graph
+
+    resource_access {
+      id   = "e1fe6dd8-ba31-4d61-89e7-88639da4683d" # User.Read
+      type = "Scope"
+    }
+  }
+}
+
+resource "azuread_service_principal" "auth_sp" {
+  client_id                    = azuread_application.auth_app.client_id
+  app_role_assignment_required = false
+  owners                       = [data.azurerm_client_config.current.object_id]
 }
 
 data "azurerm_client_config" "current" {}
@@ -234,6 +276,14 @@ resource "azurerm_container_app" "app" {
       env {
         name  = "APPLICATIONINSIGHTS_CONNECTION_STRING"
         value = azurerm_application_insights.insights.connection_string
+      }
+      env {
+        name  = "ENTRA_ID_CLIENT_ID"
+        value = azuread_application.auth_app.client_id
+      }
+      env {
+        name  = "ENTRA_ID_TENANT_ID"
+        value = data.azurerm_client_config.current.tenant_id
       }
     }
   }
