@@ -54,7 +54,7 @@ const renderApp = async () => {
     ReactDOM.createRoot(document.getElementById('root')).render(
         <React.StrictMode>
             <MsalProvider instance={msalInstance}>
-                <App />
+                <App clientId={clientId} />
             </MsalProvider>
         </React.StrictMode>,
     );

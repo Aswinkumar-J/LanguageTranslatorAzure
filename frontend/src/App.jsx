@@ -6,7 +6,7 @@ import FileUploadDropzone from './components/FileUploadDropzone';
 import HistorySidebar from './components/HistorySidebar';
 import './index.css';
 
-function App() {
+function App({ clientId }) {
   const [refreshHistory, setRefreshHistory] = useState(0);
   const [tokenReady, setTokenReady] = useState(false);
   const [authError, setAuthError] = useState(null);
@@ -16,7 +16,7 @@ function App() {
   useEffect(() => {
     if (isAuthenticated && accounts.length > 0) {
       const request = {
-        scopes: [`api://${instance.config.auth.clientId}/access_as_user`],
+        scopes: [`api://${clientId}/access_as_user`],
         account: accounts[0]
       };
 
@@ -44,7 +44,7 @@ function App() {
     } else {
       setTokenReady(false);
     }
-  }, [isAuthenticated, accounts, instance]);
+  }, [isAuthenticated, accounts, instance, clientId]);
 
   const handleTranslationSaved = () => {
     setRefreshHistory(prev => prev + 1);
@@ -53,7 +53,7 @@ function App() {
   const handleLogin = () => {
     setAuthError(null);
     instance.loginPopup({
-      scopes: [`api://${instance.config.auth.clientId}/access_as_user`],
+      scopes: [`api://${clientId}/access_as_user`],
     }).then(response => {
       setAuthToken(response.accessToken);
       setTimeout(() => {
