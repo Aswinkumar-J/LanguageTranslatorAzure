@@ -28,7 +28,9 @@ const renderApp = async () => {
         auth: {
             clientId: clientId || "",
             authority: "https://login.microsoftonline.com/common",
-            redirectUri: window.location.origin + "/",
+            redirectUri: window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" 
+                ? "http://localhost:5173/" 
+                : "https://languagecontainer.ambitiousbush-91dcd67b.centralindia.azurecontainerapps.io/",
         },
         cache: {
             cacheLocation: "sessionStorage",
